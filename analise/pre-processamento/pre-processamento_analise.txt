@@ -1,0 +1,108 @@
+
+=== Estrutura dos Dados ===
+<class 'pandas.core.frame.DataFrame'>
+RangeIndex: 126 entries, 0 to 125
+Data columns (total 28 columns):
+ #   Column                  Non-Null Count  Dtype  
+---  ------                  --------------  -----  
+ 0   uf                      126 non-null    object 
+ 1   ano                     126 non-null    int64  
+ 2   deforestation_soma      126 non-null    float64
+ 3   mining_soma             126 non-null    float64
+ 4   focos_ativos            126 non-null    float64
+ 5   t_infecciosas           126 non-null    int64  
+ 6   t_neoplasias            126 non-null    int64  
+ 7   t_sangue                126 non-null    int64  
+ 8   t_endocrinas            126 non-null    int64  
+ 9   t_nervoso               126 non-null    int64  
+ 10  t_olho                  126 non-null    int64  
+ 11  t_ouvido                126 non-null    int64  
+ 12  t_cardiovascular        126 non-null    int64  
+ 13  t_respiratorio          126 non-null    int64  
+ 14  t_digestivo             126 non-null    int64  
+ 15  t_pele                  126 non-null    int64  
+ 16  t_osteomuscular         126 non-null    int64  
+ 17  t_genitourinario        126 non-null    int64  
+ 18  t_malformacoes          126 non-null    int64  
+ 19  t_causas_externas       126 non-null    int64  
+ 20  t_influencia            126 non-null    int64  
+ 21  t_comunicaveis          126 non-null    int64  
+ 22  t_nao_comunicaveis      126 non-null    int64  
+ 23  t_malaria               126 non-null    int64  
+ 24  t_cancer_mama           126 non-null    int64  
+ 25  t_cancer_colo_do_utero  126 non-null    int64  
+ 26  t_srag                  126 non-null    int64  
+ 27  t_total                 126 non-null    int64  
+dtypes: float64(3), int64(24), object(1)
+memory usage: 27.7+ KB
+None
+
+=== Primeiras Linhas ===
+   uf   ano  deforestation_soma  mining_soma  focos_ativos  ...  t_malaria  t_cancer_mama  t_cancer_colo_do_utero  t_srag  t_total
+0  AC  2006        1.639837e+07          0.0        6198.0  ...         14              0                       0       0     8496
+1  AC  2007        1.639837e+07          0.0        8549.0  ...         10              0                       0       0     8804
+2  AC  2008        1.639837e+07          0.0        5699.0  ...         18              0                       0       0     8642
+3  AC  2009        1.639837e+07          0.0        3511.0  ...         12              0                       2       0     8850
+4  AC  2010        1.639837e+07          0.0        8661.0  ...          4              0                       0       0     8906
+
+[5 rows x 28 columns]
+
+=== Colunas Normalizadas ===
+   deforestation_soma  mining_soma  focos_ativos
+0        8.049117e-16          0.0      0.065824
+1        8.187895e-16          0.0      0.095596
+2        8.326673e-16          0.0      0.059505
+3        9.298118e-16          0.0      0.031798
+4        6.938894e-16          0.0      0.097014
+
+=== Valores Iguais a Zero ===
+Series([], dtype: object)
+
+=== Resumo Estatístico ===
+       deforestation_soma  mining_soma  focos_ativos  t_infecciosas  t_neoplasias  ...   t_malaria  t_cancer_mama  t_cancer_colo_do_utero  t_srag        t_total
+count          126.000000   126.000000    126.000000     126.000000    126.000000  ...  126.000000     126.000000              126.000000   126.0     126.000000
+mean             0.250400     0.136890      0.191178    1266.777778   3155.492063  ...    7.111111       2.571429                1.507937     0.0   38592.714286
+std              0.304785     0.214395      0.195449    1141.763127   2612.788401  ...    8.369681       3.448892                2.802131     0.0   33339.566454
+min              0.000000     0.000000      0.000000     156.000000    352.000000  ...    0.000000       0.000000                0.000000     0.0    4456.000000
+25%              0.054007     0.002478      0.047310     358.000000    805.500000  ...    2.000000       0.000000                0.000000     0.0   10081.500000
+50%              0.081072     0.039434      0.130471     689.000000   2227.000000  ...    4.000000       2.000000                0.000000     0.0   25874.000000
+75%              0.369000     0.090887      0.297814    1925.500000   4984.000000  ...   10.000000       4.000000                2.000000     0.0   55793.500000
+max              1.000000     1.000000      1.000000    4270.000000  10346.000000  ...   42.000000      16.000000               14.000000     0.0  127330.000000
+
+[8 rows x 26 columns]
+
+=== Tabela de Correlação Completa ===
+                        deforestation_soma  mining_soma  focos_ativos
+t_malformacoes                    0.821616     0.653711      0.629023
+t_osteomuscular                   0.819549     0.753629      0.646850
+t_infecciosas                     0.784902     0.729583      0.675970
+t_comunicaveis                    0.781934     0.731781      0.684549
+t_causas_externas                 0.769607     0.799187      0.696085
+t_neoplasias                      0.765315     0.746788      0.645453
+t_respiratorio                    0.764643     0.827549      0.653261
+t_sangue                          0.716315     0.729890      0.697240
+t_genitourinario                  0.697558     0.787576      0.581540
+t_total                           0.691633     0.725441      0.678194
+t_nervoso                         0.659056     0.749881      0.626703
+t_digestivo                       0.656561     0.689919      0.680435
+t_nao_comunicaveis                0.654316     0.700824      0.670866
+t_endocrinas                      0.620384     0.666657      0.614087
+t_pele                            0.601107     0.685258      0.505119
+t_cardiovascular                  0.563022     0.636984      0.680000
+t_ouvido                          0.561897     0.549314      0.540780
+t_malaria                         0.504472     0.157208      0.204379
+t_olho                            0.409249     0.424477      0.535922
+t_cancer_colo_do_utero            0.347194     0.450384      0.379070
+t_cancer_mama                     0.339465     0.358892      0.368569
+t_influencia                           NaN          NaN           NaN
+t_srag                                 NaN          NaN           NaN
+
+=== Outliers Detectados ===
+t_osteomuscular      0
+t_malformacoes       0
+t_respiratorio       7
+t_infecciosas        0
+t_comunicaveis       2
+t_causas_externas    5
+t_neoplasias         0
+Name: outlier_count, dtype: int64
