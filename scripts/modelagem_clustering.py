@@ -2,340 +2,124 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import scipy.cluster.hierarchy as sch
-
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import silhouette_score
-from sklearn.cluster import KMeans, AgglomerativeClustering, DBSCAN
+from sklearn.pipeline import Pipeline
 from sklearn.ensemble import IsolationForest
+from sklearn.cluster import KMeans, DBSCAN
+from sklearn.metrics import silhouette_score
 from sklearn.decomposition import PCA
+import scipy.cluster.hierarchy as sch
 
-# Carregar os dados
-df = pd.read_csv("resultados/eventos-doencas_amazonia.csv")
+# 1) Carregar dados
+path = 'resultados/eventos-doencas_amazonia.csv'
+df = pd.read_csv(path)
+print(f"Dados carregados: {df.shape[0]} linhas e {df.shape[1]} colunas")
 
-# Visualizando os dados
-df.head()
-df.describe()
-print(df.columns)
-
-colunas = [
-    'deforestation_soma', 'mining_soma', 't_infecciosas', 't_neoplasias',
-    't_sangue', 't_endocrinas', 't_nervoso', 't_olho', 't_ouvido',
-    't_cardiovascular', 't_respiratorio', 't_digestivo', 't_pele',
-    't_osteomuscular', 't_genitourinario', 't_malformacoes', 't_causas_externas',
-    't_influencia', 't_comunicaveis', 't_nao_comunicaveis', 't_malaria',
-    't_cancer_mama', 't_cancer_colo_do_utero', 't_srag', 't_total'
+# 2) Definir colunas para análise
+numerical_feats = [
+    'ano', 'deforestation_soma', 'mining_soma', 'focos_ativos',
+    't_infecciosas', 't_neoplasias', 't_sangue', 't_endocrinas',
+    't_nervoso', 't_olho', 't_ouvido', 't_cardiovascular',
+    't_respiratorio', 't_digestivo', 't_pele', 't_osteomuscular',
+    't_genitourinario', 't_malformacoes', 't_causas_externas',
+    't_influencia', 't_comunicaveis', 't_nao_comunicaveis',
+    't_malaria', 't_cancer_mama', 't_cancer_colo_do_utero',
+    't_srag', 't_total'
 ]
+categorical_feats = ['uf']
 
-# Pré-processamento para o Clustering: normalização dos dados
-scaler = MinMaxScaler()
-dados_normalizados = scaler.fit_transform(df[colunas])
-
-# Codificação OneHot para colunas categóricas
-categorical_features = ['uf']
-numerical_features = [ 'ano', 'deforestation_soma', 'mining_soma', 'focos_ativos',
-       't_infecciosas', 't_neoplasias', 't_sangue', 't_endocrinas',
-       't_nervoso', 't_olho', 't_ouvido', 't_cardiovascular', 't_respiratorio',
-       't_digestivo', 't_pele', 't_osteomuscular', 't_genitourinario',
-       't_malformacoes', 't_causas_externas', 't_influencia', 't_comunicaveis',
-       't_nao_comunicaveis', 't_malaria', 't_cancer_mama',
-       't_cancer_colo_do_utero', 't_srag', 't_total']
-
-# Pipeline de pré-processamento
+# 3) Pré-processamento
+num_pipe = Pipeline([
+    ('imputer', SimpleImputer(strategy='median')),
+    ('scaler', MinMaxScaler())
+])
+cat_pipe = Pipeline([
+    ('imputer', SimpleImputer(strategy='most_frequent')),
+    ('onehot', OneHotEncoder(drop='first'))
+])
 preprocessor = ColumnTransformer([
-    ('cat', OneHotEncoder(drop='first'), categorical_features),
-    ('num', MinMaxScaler(), numerical_features)
+    ('nums', num_pipe, numerical_feats),
+    ('cats', cat_pipe, categorical_feats)
 ])
 
 X = preprocessor.fit_transform(df)
+print("Pré-processamento concluído")
 
-# Detectando outliers com Isolation Forest
-iso = IsolationForest(contamination=0.05)
-yhat = iso.fit_predict(X)
-
-# Remover outliers
-mask = yhat != -1
+# 4) Remover outliers
+iso = IsolationForest(contamination=0.05, random_state=42)
+mask = iso.fit_predict(X) != -1
 X_clean = X[mask]
+df_clean = df.loc[mask].reset_index(drop=True)
+print(f"Outliers removidos: {np.sum(~mask)} registros")
 
-## Algoritmo K-MEANS
-silhouette_scores_kmeans = []
-range_n_clusters = range(2, 10)
-
-for n_clusters in range_n_clusters:
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-    labels = kmeans.fit_predict(X_clean)
-    score = silhouette_score(X_clean, labels)
-    silhouette_scores_kmeans.append(score)
-
-# Gráfico do Silhouette Score
-plt.plot(range_n_clusters, silhouette_scores_kmeans, marker='o')
-plt.title('KMeans - Índice de Silhueta')
-plt.xlabel('Número de Clusters')
-plt.ylabel('Silhouette Score')
-plt.show()
-
-
-# K-Means Clustering
-silhouette_scores_kmeans = []
-range_k = range(2, 10)
-
-for k in range_k:
-    kmeans = KMeans(n_clusters=k, random_state=42)
-    clusters_kmeans = kmeans.fit_predict(dados_normalizados)
-    silhouette_avg = silhouette_score(dados_normalizados, clusters_kmeans)
-    silhouette_scores_kmeans.append(silhouette_avg)
-
-# Visualizando o Método do Cotovelo
-# METRICA INERCIA
-from sklearn.cluster import KMeans
-import matplotlib.pyplot as plt
-
-# Lista para armazenar a inércia de cada K
-inertias = []
-k_values = range(1, 11)
-
+# 5) Avaliar K-Means
+k_values = list(range(2, 11))
+inertias, sils = [], []
 for k in k_values:
-    kmeans = KMeans(n_clusters=k, random_state=42)
-    kmeans.fit(X_clean)  # X_clean é seu dataset já pré-processado
-    inertias.append(kmeans.inertia_)
+    km = KMeans(n_clusters=k, random_state=42, n_init=10)
+    labels = km.fit_predict(X_clean)
+    inertias.append(km.inertia_)
+    sils.append(silhouette_score(X_clean, labels) if len(set(labels)) > 1 else np.nan)
 
-# Plotando o gráfico do cotovelo
-plt.figure(figsize=(8, 5))
-plt.plot(k_values, inertias, marker='o')
-plt.title('Método do Cotovelo')
-plt.xlabel('Número de Clusters (k)')
-plt.ylabel('Inércia (Soma das distâncias quadradas)')
-plt.grid(True)
-plt.xticks(k_values)
-print('\nMetodo do cotovelo utilizando a metrica da inercia')
-plt.show()
+# Visualizar método do cotovelo e silhueta
+plt.figure(figsize=(8, 4))
+plt.plot(k_values, inertias, 'o-', label='Inércia')
+plt.title('Cotovelo - KMeans')
+plt.xlabel('k'); plt.ylabel('Inércia'); plt.grid(); plt.show()
 
-# Mede a soma das distâncias quadradas entre os pontos dentro de um cluster e o centróide do cluster.
-# Quanto menor a inércia, mais compactos os clusters.
-# Você visualiza o ponto onde a redução da inércia começa a diminuir drasticamente, indicando o número ideal de clusters
+# Definir melhor k segundo o Cotovelo
+drops = np.diff(inertias)
+best_k = k_values[int(np.argmax(drops)) + 1]
+print(f"Melhor k segundo o Cotovelo: {best_k}")
 
-# METRICA INDICE DE SILHUETA
-plt.figure(figsize=(9, 6))
-plt.plot(range_k, silhouette_scores_kmeans, marker='o')
-plt.title("Método do Cotovelo - K-Means", fontsize=10)
-plt.xlabel("Número de Clusters (k)", fontsize=10)
-plt.ylabel("Índice de Silhueta", fontsize=10)
-plt.grid()
-print('\nMetodo do cotovelo utilizando a metrica do indice de silhueta')
-plt.show()
+plt.figure(figsize=(8, 4))
+plt.plot(k_values, sils, 'o-', label='Silhueta')
+plt.title('Silhouette - KMeans')
+plt.xlabel('k'); plt.ylabel('Score'); plt.grid(); plt.show()
 
-# Mede a qualidade dos clusters baseando-se na separação entre eles.
-# O índice de silhueta varia de -1 a 1: quanto mais próximo de 1, melhor a separação dos clusters.
+best_k = k_values[int(np.nanargmax(sils))]
+print(f"Melhor k segundo Silhouette: {best_k}")
 
+# 6) Avaliar DBSCAN
+eps_list = np.linspace(0.2, 1.0, 9)
+db_sils = []
+for eps in eps_list:
+    db = DBSCAN(eps=eps, min_samples=5)
+    lbl = db.fit_predict(X_clean)
+    score = silhouette_score(X_clean, lbl) if len(set(lbl)) > 1 and -1 not in set(lbl) else np.nan
+    db_sils.append(score)
 
-## Algoritmo DBSCAN
-eps_values = [0.3, 0.5, 0.7, 0.9, 1.2]
-min_samples = 5
-silhouette_scores_dbscan = []
+plt.figure(figsize=(8, 4))
+plt.plot(eps_list, db_sils, 'o-', label='Silhueta DBSCAN')
+plt.title('Silhouette - DBSCAN')
+plt.xlabel('eps'); plt.ylabel('Score'); plt.grid(); plt.show()
 
-for eps in eps_values:
-    dbscan = DBSCAN(eps=eps, min_samples=min_samples)
-    labels = dbscan.fit_predict(X_clean)
+best_eps = eps_list[int(np.nanargmax(db_sils))]
+print(f"Melhor eps segundo Silhouette: {best_eps:.2f}")
 
-    # Filtrar ruído
-    if len(set(labels)) > 1:
-        score = silhouette_score(X_clean, labels)
-    else:
-        score = -1
-    silhouette_scores_dbscan.append(score)
+# 7) Aplicar clusters finais
+df_clean['Cluster_KMeans'] = KMeans(n_clusters=best_k, random_state=42, n_init=10).fit_predict(X_clean)
+df_clean['Cluster_DBSCAN'] = DBSCAN(eps=best_eps, min_samples=5).fit_predict(X_clean)
 
-# Gráfico DBSCAN
-plt.plot(eps_values, silhouette_scores_dbscan, marker='x', color='green')
-plt.title('DBSCAN - Índice de Silhueta')
-plt.xlabel('EPS')
-plt.ylabel('Silhouette Score')
-plt.show()
+# 8) Visualização com PCA
+pca = PCA(n_components=2, random_state=42)
+proj = pca.fit_transform(X_clean)
+plt.figure(figsize=(6, 5))
+sns.scatterplot(x=proj[:,0], y=proj[:,1], hue=df_clean['Cluster_KMeans'].astype(str), palette='tab10')
+plt.title(f'KMeans (k={best_k})'); plt.show()
 
+plt.figure(figsize=(6, 5))
+sns.scatterplot(x=proj[:,0], y=proj[:,1], hue=df_clean['Cluster_DBSCAN'].astype(str), palette='tab10')
+plt.title(f'DBSCAN (eps={best_eps:.2f})'); plt.show()
 
-# DBSCAN Clustering
-silhouette_scores_dbscan = []
-eps_values = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
+# 9) Dendrograma Hierárquico
+link = sch.linkage(X_clean, method='ward')
+sch.dendrogram(link, truncate_mode='level', p=12)
+plt.title('Dendrograma Hierárquico'); plt.ylabel('Distância'); plt.show()
 
-for eps in eps_values:
-    dbscan = DBSCAN(eps=eps, min_samples=5)
-    clusters_dbscan = dbscan.fit_predict(dados_normalizados)
-
-    # Evitar clusters únicos ou não rotulados para cálculo do silhouette
-    if len(set(clusters_dbscan)) > 1:
-        silhouette_avg = silhouette_score(dados_normalizados, clusters_dbscan)
-        silhouette_scores_dbscan.append(silhouette_avg)
-    else:
-        silhouette_scores_dbscan.append(-1)
-
-# Visualizando os resultados do DBSCAN
-plt.figure(figsize=(10, 6))
-plt.plot(eps_values, silhouette_scores_dbscan, marker='o', color='orange')
-plt.title("Variação do EPS - DBSCAN", fontsize=14)
-plt.xlabel("EPS", fontsize=12)
-plt.ylabel("Índice de Silhueta", fontsize=12)
-plt.grid()
-plt.show()
-
-
-## Resultados
-# BASEADO NA INERCIA
-# Kmeans
-print('Resultados Kmeans:')
-for indice, valor in zip(range_n_clusters, silhouette_scores_kmeans):
-    print(f"Índice: {indice}, Valor: {valor}")
-
-print('\n')
-
-# DBSCAN
-print('Resultados DBSCAN:')
-for indice, valor in zip(eps_values, silhouette_scores_dbscan):
-    print(f"Índice: {indice}, Valor: {valor}")
-
-# Metodo cotovelo
-from sklearn.cluster import KMeans
-import matplotlib.pyplot as plt
-
-# Lista para armazenar a inércia de cada K
-inertias = []
-k_values = range(1, 11)
-
-for k in k_values:
-    kmeans = KMeans(n_clusters=k, random_state=42)
-    kmeans.fit(X_clean)  # X_clean é seu dataset já pré-processado
-    inertias.append(kmeans.inertia_)
-
-
-# K-MEANS: Melhor resultado é onde o cotovelo "quebra" no 2
-# DBSCAN: Melhor resultado é no 0,9
-
-# Melhor valor de EPS (com base no gráfico do DBSCAN)
-# Note: eps_values used here was the second list defined for DBSCAN plotting
-eps_otimo = eps_values[np.argmax(silhouette_scores_dbscan)]
-dbscan_final = DBSCAN(eps=eps_otimo, min_samples=5)
-df['Cluster_DBSCAN'] = dbscan_final.fit_predict(dados_normalizados) # This part uses dados_normalizados, be careful if you intended to use X_clean
-
-# Determine the best K from the KMeans silhouette scores
-# Note: range_n_clusters was used for the first KMeans silhouette plot
-best_k = range_n_clusters[np.argmax(silhouette_scores_kmeans)]
-
-# Apply KMeans with the best k to the cleaned data and get labels
-kmeans_final = KMeans(n_clusters=best_k, random_state=42, n_init=10) # Add n_init to avoid warning
-# We need to apply these labels back to the original df, aligning with X_clean
-# Create a new column for K-Means clusters and initialize with None or a placeholder
-df['Cluster_KMeans'] = np.nan
-
-# Fit KMeans on X_clean and get labels for the clean data
-labels_kmeans = kmeans_final.fit_predict(X_clean)
-
-# Assign the KMeans labels to the corresponding rows in the original df
-# The mask created earlier from Isolation Forest indicates which rows in df correspond to rows in X_clean
-df.loc[mask, 'Cluster_KMeans'] = labels_kmeans
-
-# Convert cluster column to string to ensure it's treated as categorical for hue
-df['Cluster_KMeans'] = df['Cluster_KMeans'].astype(str)
-df['Cluster_DBSCAN'] = df['Cluster_DBSCAN'].astype(str)
-
-
-# Visualizando os Clusters
-# Ensure the columns for plotting exist in df
-plot_vars = ['deforestation_soma', 'mining_soma', 't_total']
-if all(col in df.columns for col in plot_vars + ['Cluster_KMeans']):
-    sns.pairplot(df.dropna(subset=['Cluster_KMeans']), vars=plot_vars, hue='Cluster_KMeans', palette='Set2') # Drop rows with NaN in Cluster_KMeans for plotting
-    plt.title("Clusters - K-Means", fontsize=16)
-    plt.show()
-else:
-    print("One or more columns for K-Means pairplot not found in DataFrame.")
-
-if all(col in df.columns for col in plot_vars + ['Cluster_DBSCAN']):
-    sns.pairplot(df.dropna(subset=['Cluster_DBSCAN']), vars=plot_vars, hue='Cluster_DBSCAN', palette='Set1') # Drop rows with NaN in Cluster_DBSCAN for plotting
-    plt.title("Clusters - DBSCAN", fontsize=16)
-    plt.show()
-else:
-     print("One or more columns for DBSCAN pairplot not found in DataFrame.")
-
-
-# Análise Final
-# Need k_otimo from the previous KMeans section, assuming it was determined there
-# If not, use best_k calculated above
-print("Número de Clusters K-Means:", best_k) # Using best_k calculated here
-print("Número de Clusters DBSCAN:", len(set(df['Cluster_DBSCAN'].dropna())) - (1 if '-1.0' in df['Cluster_DBSCAN'].astype(str).unique() else 0)) # Account for '-1' as string after conversion
-
-
-# # Melhor valor de EPS (com base no gráfico do DBSCAN)
-# eps_otimo = eps_values[np.argmax(silhouette_scores_dbscan)]
-# dbscan_final = DBSCAN(eps=eps_otimo, min_samples=5)
-# df['Cluster_DBSCAN'] = dbscan_final.fit_predict(dados_normalizados)
-
-# # Visualizando os Clusters
-# sns.pairplot(df, vars=['deforestation_soma', 'mining_soma', 't_total'], hue='Cluster_KMeans', palette='Set2')
-# plt.title("Clusters - K-Means", fontsize=16)
-# plt.show()
-
-# sns.pairplot(df, vars=['deforestation_soma', 'mining_soma', 't_total'], hue='Cluster_DBSCAN', palette='Set1')
-# plt.title("Clusters - DBSCAN", fontsize=16)
-# plt.show()
-
-# # Análise Final
-# print("Número de Clusters K-Means:", k_otimo)
-# print("Número de Clusters DBSCAN:", len(set(df['Cluster_DBSCAN'])) - (1 if -1 in df['Cluster_DBSCAN'] else 0))
-
-# Encontrando o melhor clustering
-pca = PCA(n_components=2)
-X_2D = pca.fit_transform(X_clean)
-
-# KMeans com melhor cluster
-best_k = range_n_clusters[np.argmax(silhouette_scores_kmeans)]
-kmeans = KMeans(n_clusters=best_k, random_state=42)
-labels_kmeans = kmeans.fit_predict(X_clean)
-
-plt.figure(figsize=(8, 5))
-plt.scatter(X_2D[:, 0], X_2D[:, 1], c=labels_kmeans, cmap='viridis')
-plt.title(f'KMeans com {best_k} clusters')
-plt.xlabel('PCA1')
-plt.ylabel('PCA2')
-plt.show()
-
-# Dendograma
-# Usar apenas duas features para simplificar visualização do dendrograma
-sample_df = df[[ 'deforestation_soma', 'mining_soma', 'focos_ativos',
-       't_infecciosas', 't_neoplasias', 't_sangue', 't_endocrinas',
-       't_nervoso', 't_olho', 't_ouvido', 't_cardiovascular', 't_respiratorio',
-       't_digestivo', 't_pele', 't_osteomuscular', 't_genitourinario',
-       't_malformacoes', 't_causas_externas', 't_influencia', 't_comunicaveis',
-       't_nao_comunicaveis', 't_malaria', 't_cancer_mama',
-       't_cancer_colo_do_utero', 't_srag', 't_total']]
-scaled_sample = MinMaxScaler().fit_transform(sample_df)
-
-Z = sch.linkage(scaled_sample, method='ward')
-
-plt.figure(figsize=(12, 6))
-sch.dendrogram(Z, p=12, truncate_mode='level')
-plt.title('Dendrograma - Cluster Hierárquico')
-plt.xlabel('doencas')
-plt.ylabel('Distância')
-plt.show()
-
-Z = sch.linkage(df[['deforestation_soma', 'mining_soma', 'focos_ativos',
-       't_infecciosas', 't_neoplasias', 't_sangue', 't_endocrinas',
-       't_nervoso', 't_olho', 't_ouvido', 't_cardiovascular', 't_respiratorio',
-       't_digestivo', 't_pele', 't_osteomuscular', 't_genitourinario',
-       't_malformacoes', 't_causas_externas', 't_influencia', 't_comunicaveis',
-       't_nao_comunicaveis', 't_malaria', 't_cancer_mama',
-       't_cancer_colo_do_utero', 't_srag', 't_total']], method='centroid')
-
-# p = altura máxima que será exibida
-sch.dendrogram(Z, p = 6, truncate_mode = "level")
-
-
-# Analise do Clustering
-# Reatribuir cluster ao DataFrame original (sem outliers)
-df_clean = df[mask].copy()
-df_clean['cluster_kmeans'] = labels_kmeans
-
-# Visualizar 3 itens de cada cluster
-for cluster in sorted(df_clean['cluster_kmeans'].unique()):
-    print(f"\nCluster {cluster}")
-    print(df_clean[df_clean['cluster_kmeans'] == cluster].sample(10))
+# 10) Salvar resultados
+out_path = 'resultados/clusters_amazonia.csv'
+df_clean.to_csv(out_path, index=False)
+print(f"Clusters salvos em: {out_path}")
